@@ -1,0 +1,56 @@
+{
+  "name": "imp-interface",
+  "productName": "IMP Squad Comando",
+  "version": "0.3.0",
+  "description": "Janela visual de comando da IMP Dev Squad (Electron + sala 3D + chat orquestrador).",
+  "private": true,
+  "main": "main.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --enable-logging",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win --x64",
+    "pack": "electron-builder --dir"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.imp.squad.comando",
+    "productName": "IMP Squad Comando",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "IMP-Squad-Comando-${version}-portable.exe"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ]
+    },
+    "asar": true,
+    "compression": "normal"
+  },
+  "author": "Claudio (IMP CTO)",
+  "license": "ISC"
+}

@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IMP Squad — Comando</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <!-- Top bar -->
+  <header id="topbar">
+    <div class="brand">
+      <span class="logo" id="brand-logo">🟦</span>
+      <strong>IMP Squad <span class="brand-sep">·</span> Comando</strong>
+      <span class="version">v0.3</span>
+    </div>
+    <div class="status">
+      <!-- Pílula única de status (clicável → abre status-panel) -->
+      <button class="status-pill" id="btn-status-pill" title="Diagnóstico do ambiente">
+        <span class="status-pill-icon" id="status-pill-icon">⏳</span>
+        <span class="status-pill-text" id="status-pill-text">checando…</span>
+        <span class="status-pill-chevron">▾</span>
+      </button>
+      <button class="btn-ghost" id="btn-settings" title="Configurações de ambiente (Ctrl+,)">⚙️</button>
+    </div>
+  </header>
+
+  <!-- Status panel dropdown (Camila #2) -->
+  <div id="status-panel" class="status-panel" hidden>
+    <div class="status-panel-head">
+      <h3>Status do ambiente</h3>
+      <button class="btn-mini" id="btn-status-refresh">↻ recarregar</button>
+    </div>
+    <ul id="status-checklist" class="status-checklist"></ul>
+    <div class="status-panel-foot">
+      <span class="hint" id="status-platform">—</span>
+      <button class="btn-ghost btn-small" id="btn-status-open-settings">Configurar caminhos…</button>
+    </div>
+  </div>
+
+  <main>
+    <!-- Sidebar agentes + comandos -->
+    <aside id="sidebar">
+      <div class="section">
+        <div class="section-title">
+          <span>👥 Squad</span>
+          <button id="btn-refresh-agents" class="btn-mini" title="Recarregar">↻</button>
+        </div>
+        <ul id="agents-list" class="agents">
+          <li class="loading">carregando…</li>
+        </ul>
+        <button id="btn-new-persona" class="btn-primary full">➕ Nova persona</button>
+      </div>
+
+      <div class="section">
+        <div class="section-title"><span>⚙️ Config ativa</span></div>
+        <select id="config-select">
+          <option value="">— escolher config —</option>
+        </select>
+        <p class="hint" id="config-hint">configs em <code>imp-orchestrator-v2/config/</code></p>
+      </div>
+
+      <div class="section grow">
+        <div class="section-title"><span>📜 Log local</span><button id="btn-clear-log" class="btn-mini">limpar</button></div>
+        <pre id="local-log">— sem eventos ainda —</pre>
+      </div>
+    </aside>
+
+    <!-- Centro: sala 3D + overlays -->
+    <section id="stage">
+      <div id="stage-header">
+        <span>🏠 Sala da Squad</span>
+        <div class="stage-actions">
+          <span class="live-pill" id="live-pill" hidden>
+            <span class="live-dot"></span>
+            AO VIVO
+          </span>
+          <button id="btn-reload-3d" class="btn-mini">↻ 3D</button>
+        </div>
+      </div>
+      <div id="stage-3d-wrap">
+        <iframe id="frame-3d" title="Sala 3D" src="about:blank"></iframe>
+        <!-- Spotlight do agente que fala -->
+        <div id="spotlight-overlay" class="spotlight-overlay" hidden></div>
+        <!-- Bolhas (E7) -->
+        <div id="bubbles-overlay"></div>
+        <!-- WELCOME / EMPTY STATE (Camila #1) -->
+        <div id="welcome-overlay" class="welcome-overlay" hidden>
+          <div class="welcome-card">
+            <div class="welcome-icon" id="welcome-icon">👋</div>
+            <h2 id="welcome-title">Bem-vindo ao Comando</h2>
+            <p id="welcome-msg" class="welcome-msg">Detectando ambiente da squad…</p>
+            <div id="welcome-actions" class="welcome-actions"></div>
+            <details class="welcome-details" id="welcome-details">
+              <summary>O que está faltando?</summary>
+              <ul id="welcome-checklist"></ul>
+              <p class="hint" style="margin-top:8px;">
+                Você pode <strong>continuar usando a interface vazia</strong> e configurar depois — clique em "Continuar mesmo assim".
+              </p>
+            </details>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Painel direito: caixa de comando + chat real-time -->
+    <aside id="rightpane">
+      <div class="section">
+        <div class="section-title"><span>📨 Enviar missão</span></div>
+        <label>Para:
+          <select id="target-agent">
+            <option value="TODOS">@@PARA:TODOS@@ (broadcast)</option>
+          </select>
+        </label>
+        <textarea id="msg-text" rows="6" placeholder="Digite a missão / pergunta. Pode usar @@PARA:nome@@ pra mirar manualmente. Ctrl+Enter envia."></textarea>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="msg-fim" checked> incluir <code>@@FIM@@</code></label>
+          <button id="btn-send" class="btn-primary">📤 Enviar</button>
+        </div>
+        <p class="hint" id="send-hint">Envia via <code>tmux send-keys</code> pro painel do agente alvo.</p>
+      </div>
+
+      <div class="section grow chat-section">
+        <div class="section-title">
+          <span>💬 Squad ao vivo</span>
+          <span id="chat-status" class="badge unknown" style="font-size:10px;padding:1px 6px;">parado</span>
+          <button id="btn-chat-toggle" class="btn-mini" title="liga/desliga polling tmux">▶</button>
+          <button id="btn-chat-clear" class="btn-mini" title="limpa histórico local">🧹</button>
+        </div>
+        <div id="chat-log" class="chat-log">
+          <p class="hint" style="padding:14px;">Clica <strong>▶</strong> pra começar a ouvir os agentes. As respostas aparecem aqui em tempo real.</p>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- TOAST container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Modal: nova persona -->
+  <div id="modal-overlay" class="modal-overlay" hidden>
+    <div class="modal">
+      <header>
+        <h2>➕ Nova persona</h2>
+        <button class="close" id="modal-close">×</button>
+      </header>
+      <div class="body">
+        <label>Slug (pasta — minúsculas, _ ou -):
+          <input type="text" id="p-dir" placeholder="ex: estrategista">
+        </label>
+        <label>Nome completo:
+          <input type="text" id="p-nome" placeholder="ex: Roberto Sousa">
+        </label>
+        <label>Papel (curto):
+          <input type="text" id="p-papel" placeholder="ex: estrategista">
+        </label>
+        <label>Cargo (opcional):
+          <input type="text" id="p-cargo" placeholder="ex: Estrategista de Produto">
+        </label>
+        <label>Identidade (1 frase em 1ª pessoa):
+          <textarea id="p-identidade" rows="2" placeholder="Sou Roberto, estrategista da IMP..."></textarea>
+        </label>
+        <label>Função (1 frase):
+          <textarea id="p-funcao" rows="2" placeholder="Eu defino a direção estratégica do produto."></textarea>
+        </label>
+        <label>Estilo de comunicação:
+          <input type="text" id="p-estilo" placeholder="Direto. Penso em outcomes, não outputs.">
+        </label>
+        <label>O que DEVE fazer (1 por linha):
+          <textarea id="p-dos" rows="3" placeholder="Validar hipóteses com dados&#10;Recusar features sem outcome claro"></textarea>
+        </label>
+        <label>O que NÃO DEVE fazer (1 por linha):
+          <textarea id="p-donts" rows="3" placeholder="Decidir arquitetura técnica&#10;Escrever código"></textarea>
+        </label>
+      </div>
+      <footer>
+        <button class="btn-ghost" id="modal-cancel">Cancelar</button>
+        <button class="btn-primary" id="modal-create">Criar persona</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Modal: SETTINGS de ambiente -->
+  <div id="settings-overlay" class="modal-overlay" hidden>
+    <div class="modal">
+      <header>
+        <h2>⚙️ Configurações de ambiente</h2>
+        <button class="close" id="settings-close">×</button>
+      </header>
+      <div class="body">
+        <p class="hint">
+          A interface precisa saber onde estão a <strong>squad</strong> (<code>_squad/</code>), o <strong>orquestrador</strong>
+          e a <strong>sala 3D</strong>. Configure cada caminho — eles são persistidos em <code>~/.imp-interface/config.json</code>.
+        </p>
+
+        <div class="settings-field">
+          <label>📁 Pasta raiz dos projetos (opcional — usado pra auto-descoberta)</label>
+          <div class="path-row">
+            <input type="text" id="cfg-projRoot" placeholder="ex: C:\Projetos OU /mnt/c/Projetos">
+            <button class="btn-mini" data-pick="projRoot">Procurar…</button>
+          </div>
+        </div>
+        <div class="settings-field">
+          <label>👥 Pasta da Squad (_squad)</label>
+          <div class="path-row">
+            <input type="text" id="cfg-squad" placeholder="ex: C:\Projetos\_squad">
+            <button class="btn-mini" data-pick="squad">Procurar…</button>
+          </div>
+        </div>
+        <div class="settings-field">
+          <label>🤖 Pasta do Orquestrador (imp-orchestrator-v2)</label>
+          <div class="path-row">
+            <input type="text" id="cfg-orchestrator" placeholder="ex: C:\Projetos\imp-orchestrator-v2">
+            <button class="btn-mini" data-pick="orchestrator">Procurar…</button>
+          </div>
+        </div>
+        <div class="settings-field">
+          <label>🏠 Pasta da Sala 3D (escritorio-3d)</label>
+          <div class="path-row">
+            <input type="text" id="cfg-escritorio3d" placeholder="ex: C:\Projetos\escritorio-3d">
+            <button class="btn-mini" data-pick="escritorio3d">Procurar…</button>
+          </div>
+        </div>
+        <div class="settings-field">
+          <label>🔌 Backend de tmux</label>
+          <select id="cfg-tmuxBackend">
+            <option value="">Auto-detectar</option>
+            <option value="native">Nativo (WSL/Linux/Mac)</option>
+            <option value="wsl">Via WSL (Windows com WSL2)</option>
+            <option value="unavailable">Desabilitar tmux (modo demo)</option>
+          </select>
+          <p class="hint" id="cfg-tmuxBackend-hint">Auto-detectar é a opção segura. Mude só se souber o que está fazendo.</p>
+        </div>
+        <div class="settings-field">
+          <label>🪟 Nome da sessão tmux</label>
+          <input type="text" id="cfg-tmuxSession" placeholder="imp">
+        </div>
+      </div>
+      <footer>
+        <button class="btn-ghost" id="settings-cancel">Cancelar</button>
+        <button class="btn-primary" id="settings-save">Salvar e recarregar</button>
+      </footer>
+    </div>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
