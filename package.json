@@ -1,7 +1,7 @@
 {
   "name": "imp-interface",
   "productName": "IMP Squad Comando",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Janela visual de comando da IMP Dev Squad (Electron + sala 3D + chat orquestrador).",
   "private": true,
   "main": "main.js",
@@ -29,6 +29,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "src/**/*",
       "renderer/**/*",
       "package.json"
     ],
