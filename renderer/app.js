@@ -212,6 +212,8 @@ function countReady() {
 // ── SETTINGS MODAL ─────────────────────────────────────────────────────
 function openSettings() {
   if (!_envCache) return;
+  // Mutex: só um modal por vez (evita sobreposição Settings × Persona)
+  closePersonaModal();
   $('#cfg-projRoot').value = _envCache.paths.projRoot || '';
   $('#cfg-squad').value = _envCache.paths.squad || '';
   $('#cfg-orchestrator').value = _envCache.paths.orchestrator || '';
@@ -559,7 +561,11 @@ function spotlight(dir) {
 }
 
 // ── MODAL: persona ─────────────────────────────────────────────────────
-function openPersonaModal() { $('#modal-overlay').removeAttribute('hidden'); }
+function openPersonaModal() {
+  // Mutex: fecha Settings se aberto (evita os 2 modais sobrepostos do print)
+  closeSettings();
+  $('#modal-overlay').removeAttribute('hidden');
+}
 function closePersonaModal() {
   $('#modal-overlay').setAttribute('hidden', '');
   ['p-dir','p-nome','p-papel','p-cargo','p-identidade','p-funcao','p-estilo','p-dos','p-donts'].forEach(id => {
@@ -607,6 +613,13 @@ $('#btn-settings').addEventListener('click', openSettings);
 $('#settings-close').addEventListener('click', closeSettings);
 $('#settings-cancel').addEventListener('click', closeSettings);
 $('#settings-save').addEventListener('click', saveSettings);
+// Click no backdrop (fora da .modal) também fecha
+$('#settings-overlay').addEventListener('click', (e) => {
+  if (e.target.id === 'settings-overlay') closeSettings();
+});
+$('#modal-overlay').addEventListener('click', (e) => {
+  if (e.target.id === 'modal-overlay') closePersonaModal();
+});
 $$('button[data-pick]').forEach(b => {
   b.addEventListener('click', () => {
     const key = b.dataset.pick;
@@ -614,6 +627,21 @@ $$('button[data-pick]').forEach(b => {
   });
 });
 $('#btn-refresh-agents').addEventListener('click', loadAgents);
+
+// Patrícia audit: #config-select era botão morto. Vira no-op transparente
+// até a feature de aplicar config no orquestrador estar pronta.
+$('#config-select').addEventListener('change', (e) => {
+  const v = e.target.value;
+  if (!v) return;
+  if (api.orchestrator && typeof api.orchestrator.applyConfig === 'function') {
+    api.orchestrator.applyConfig(v).then(r => {
+      if (r && r.ok) toast(`Config "${v}" aplicada`, 'success');
+      else toast(`Erro: ${r && r.error || 'desconhecido'}`, 'error');
+    });
+  } else {
+    toast(`Config "${v}" selecionada — aplicação manual por enquanto`, 'info', 3500);
+  }
+});
 $('#btn-clear-log').addEventListener('click', () => { $('#local-log').textContent = '— limpo —'; });
 $('#btn-new-persona').addEventListener('click', openPersonaModal);
 $('#modal-close').addEventListener('click', closePersonaModal);

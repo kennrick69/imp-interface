@@ -479,6 +479,12 @@ label input, label textarea, label select { margin-top: 4px; }
   display: flex; align-items: center; justify-content: center;
   z-index: 1000;
 }
+/* hidden attr precisa vencer o display:flex da classe .modal-overlay
+   (sem isso, os botões X/Cancelar não conseguem esconder o overlay). */
+.modal-overlay[hidden],
+.status-panel[hidden],
+.welcome-overlay[hidden],
+.live-pill[hidden] { display: none !important; }
 .modal {
   background: var(--bg-card);
   border: 1px solid var(--border);
