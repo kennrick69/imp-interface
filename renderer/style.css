@@ -652,3 +652,65 @@ label input, label textarea, label select { margin-top: 4px; }
   font-size: 16px; line-height: 1; padding: 0 4px;
 }
 .toast-close:hover { color: var(--text-primary); }
+
+/* ───────── Paste preview (thumbs de prints colados) ───────── */
+.paste-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
+  margin: 8px 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.paste-thumb {
+  position: relative;
+  width: 100px;
+  height: 75px;
+  border: 1px solid #0D9488;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg-darker);
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.paste-thumb:hover {
+  transform: scale(1.08);
+  border-color: #14b8a6;
+  box-shadow: 0 0 12px rgba(20, 184, 166, 0.35);
+}
+
+.paste-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.paste-thumb-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 22px;
+  height: 22px;
+  background: rgba(239, 68, 68, 0.7);
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.paste-thumb-remove:hover { background: rgba(239, 68, 68, 1); }

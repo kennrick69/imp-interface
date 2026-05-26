@@ -13,8 +13,25 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
+const os = require('node:os');
 const http = require('node:http');
 const crypto = require('node:crypto');
+
+const VALID_PASTE_EXTS = new Set(['png', 'jpg', 'jpeg', 'webp']);
+const MAX_PASTE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+// Vassoura: limpa prints colados >24h pra /tmp não inflar (sugestão Patrícia)
+function sweepOldPastes() {
+  try {
+    const tmp = os.tmpdir();
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    for (const f of fs.readdirSync(tmp)) {
+      if (!/^imp-paste-\d+\.(png|jpg|jpeg|webp)$/i.test(f)) continue;
+      const full = path.join(tmp, f);
+      try { if (fs.statSync(full).mtimeMs < cutoff) fs.unlinkSync(full); } catch (_) {}
+    }
+  } catch (_) {}
+}
 
 const env = require('./src/env');
 const tmuxBridge = require('./src/tmux-bridge');
@@ -129,6 +146,23 @@ ipcMain.handle('shell:openExternal', async (_evt, url) => {
   if (!url || typeof url !== 'string') return { ok: false };
   try { await shell.openExternal(url); return { ok: true }; }
   catch (e) { return { ok: false, error: e.message }; }
+});
+
+// ────────────────────────────────────────────────────────────────────────
+// IPC: CLIPBOARD — salvar print colado em /tmp pra Claude Code Read()
+// ────────────────────────────────────────────────────────────────────────
+ipcMain.handle('clipboard:savePastedImage', async (_e, { buffer, ext }) => {
+  try {
+    const safeExt = String(ext || 'png').toLowerCase();
+    if (!VALID_PASTE_EXTS.has(safeExt)) return { ok: false, error: 'formato não suportado: ' + safeExt };
+    const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+    if (buf.length > MAX_PASTE_BYTES) return { ok: false, error: 'arquivo > 10 MB' };
+    const target = path.join(os.tmpdir(), `imp-paste-${Date.now()}.${safeExt}`);
+    fs.writeFileSync(target, buf);
+    return { ok: true, path: target, bytes: buf.length };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 });
 
 // ────────────────────────────────────────────────────────────────────────
@@ -356,7 +390,7 @@ if (!gotLock) {
   });
 
   app.whenReady().then(async () => {
-    // Carrega env primeiro pra ter staticServer apontando pro lugar certo
+    sweepOldPastes();
     refreshEnv();
     try { await startStaticServer(); }
     catch (e) { console.warn('[interface] static server falhou:', e.message); }

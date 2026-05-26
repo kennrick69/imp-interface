@@ -44,4 +44,8 @@ contextBridge.exposeInMainWorld('api', {
   shell: {
     openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
   },
+  clipboard: {
+    savePastedImage: (arrayBuffer, ext) =>
+      ipcRenderer.invoke('clipboard:savePastedImage', { buffer: arrayBuffer, ext }),
+  },
 });

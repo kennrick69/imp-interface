@@ -43,6 +43,32 @@ function log(msg) {
   else el.textContent = text + el.textContent;
 }
 
+// ── PASTE DE PRINTS (Bruno) ────────────────────────────────────────────
+// Estado dos pastes pendentes (paths em /tmp). Camila renderiza thumbnails.
+let _pendingPastes = [];
+
+function getPendingPastes() { return [..._pendingPastes]; }
+function clearPendingPastes() {
+  _pendingPastes = [];
+  if (typeof window.clearPastedPreviews === 'function') window.clearPastedPreviews();
+}
+
+// API pra Camila (UI de thumbnails)
+window.attachPastedImage = (path) => {
+  if (!path) return;
+  _pendingPastes.push(path);
+  if (typeof window._renderPasteThumb === 'function') window._renderPasteThumb(path);
+};
+window._removePendingPaste = (path) => {
+  _pendingPastes = _pendingPastes.filter(p => p !== path);
+};
+
+function buildMessageWithPastes(text, pastes) {
+  if (!pastes || !pastes.length) return text;
+  const tags = pastes.map(p => `[PRINT: ${p}]`).join(' ');
+  return (text.trim() ? text.trim() + '\n\n' : '') + tags;
+}
+
 // ── ENV / STATUS PANEL ─────────────────────────────────────────────────
 async function loadEnv() {
   const r = await api.env.get();
@@ -384,10 +410,12 @@ function renderTargetSelect() {
 // ── ENVIO ──────────────────────────────────────────────────────────────
 async function sendMessage() {
   const target = $('#target-agent').value;
-  const text = $('#msg-text').value.trim();
+  const rawText = $('#msg-text').value.trim();
   const addFim = $('#msg-fim').checked;
-  if (!text) { toast('Digite a mensagem.', 'warn'); return; }
-  const full = `@@PARA:${target}@@ ${text}${addFim ? '\n@@FIM@@' : ''}`;
+  const pastes = getPendingPastes();
+  if (!rawText && !pastes.length) { toast('Digite a mensagem.', 'warn'); return; }
+  const body = buildMessageWithPastes(rawText, pastes);
+  const full = `@@PARA:${target}@@ ${body}${addFim ? '\n@@FIM@@' : ''}`;
   const targetDir = (target === 'TODOS') ? 'lider' : target;
   const paneIndex = _paneMap[targetDir];
   if (paneIndex === undefined) {
@@ -396,15 +424,16 @@ async function sendMessage() {
   }
   log(`📤 enviando pra pane #${paneIndex} (${targetDir})…`);
   const r = await api.tmux.sendKeys({ session: _sessionName, paneIndex, text: full, pressEnter: true });
-  if (r.ok) {
-    log(`✅ enviado @@PARA:${target}@@`);
+  if (r && r.ok) {
+    log(`✅ enviado @@PARA:${target}@@${pastes.length ? ` (+${pastes.length} print${pastes.length>1?'s':''})` : ''}`);
     toast(`Enviado pra ${targetDir} ✉️`, 'success', 2400);
     $('#msg-text').value = '';
-  } else if (r.tmuxUnavailable) {
+    clearPendingPastes();
+  } else if (r && r.tmuxUnavailable) {
     toast('tmux indisponível neste ambiente. Configure em ⚙️ Configurações.', 'error', 6000);
   } else {
-    log(`❌ erro send: ${r.error}`);
-    toast('Erro: ' + (r.error || ''), 'error');
+    log(`❌ erro send: ${r && r.error}`);
+    toast('Erro: ' + ((r && r.error) || ''), 'error');
   }
 }
 
@@ -655,6 +684,35 @@ $('#btn-reload-3d').addEventListener('click', async () => {
   if (u.ok) $('#frame-3d').src = u.url + '?t=' + Date.now();
 });
 
+// Paste de prints na textarea de missão (Bruno)
+(() => {
+  const ta = $('#msg-text');
+  if (!ta) return;
+  ta.addEventListener('paste', async (e) => {
+    const items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    for (const item of items) {
+      if (!item.type || !item.type.startsWith('image/')) continue;
+      e.preventDefault();
+      const blob = item.getAsFile();
+      if (!blob) continue;
+      const ext = (item.type.split('/')[1] || 'png').toLowerCase();
+      try {
+        const buf = await blob.arrayBuffer();
+        const r = await api.clipboard.savePastedImage(buf, ext);
+        if (r && r.ok) {
+          window.attachPastedImage(r.path);
+          toast('Print colado ✓', 'success', 2000);
+        } else {
+          toast('Erro ao colar: ' + ((r && r.error) || 'desconhecido'), 'error');
+        }
+      } catch (err) {
+        toast('Erro ao processar paste: ' + err.message, 'error');
+      }
+    }
+  });
+})();
+
 // Atalhos teclado (Patrícia/Camila)
 document.addEventListener('keydown', (e) => {
   // Ctrl+Enter envia
@@ -680,6 +738,40 @@ document.addEventListener('click', (e) => {
   if (p.contains(e.target) || $('#btn-status-pill').contains(e.target)) return;
   toggleStatusPanel(false);
 });
+
+// ───────── Paste preview visual (Camila) ─────────
+// Bruno chama window.attachPastedImage(path) → ele aciona window._renderPasteThumb(path)
+// Ao envio bem-sucedido, Bruno chama window.clearPastedPreviews()
+window._renderPasteThumb = (path) => {
+  const c = $('#paste-preview');
+  if (!c) return;
+  c.hidden = false;
+  const thumb = document.createElement('div');
+  thumb.className = 'paste-thumb';
+  thumb.dataset.path = path;
+  const img = document.createElement('img');
+  img.src = 'file://' + path;
+  img.alt = 'print';
+  img.draggable = false;
+  const btn = document.createElement('button');
+  btn.className = 'paste-thumb-remove';
+  btn.innerHTML = '×';
+  btn.setAttribute('aria-label', 'Remover print');
+  btn.title = 'Remover este print';
+  btn.onclick = () => {
+    thumb.remove();
+    window._removePendingPaste?.(path);
+    if (c.children.length === 0) c.hidden = true;
+  };
+  thumb.appendChild(img);
+  thumb.appendChild(btn);
+  c.appendChild(thumb);
+};
+
+window.clearPastedPreviews = () => {
+  const c = $('#paste-preview');
+  if (c) { c.innerHTML = ''; c.hidden = true; }
+};
 
 // ── AUTO-BOOT ──────────────────────────────────────────────────────────
 (async () => {
